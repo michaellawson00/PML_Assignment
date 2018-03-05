@@ -10,21 +10,28 @@ knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 library(rpart)
 library(gbm)
 library(caret)
+library(rpart)
+set.seed(800815)
 ```
 
 ## Introduction
 
-The goal of this work is to predict the manner in which a group of individuals prefromed a barbell lift based on the response of wearable accelerometers. More information is available from the follwoing website: - 
+The goal of this work is to predict the manner in which a group of individuals preformed a barbell lift based on the response of wearable accelerometers. More information is available from the following website: - 
 
 http://web.archive.org/web/20161125212224/http://groupware.les.inf.puc-rio.br:80/work.jsf?p1=10335
 
 ### Importing Data
 
-We begin by importing a dataset that contains data extracted from the acceleraomters, as well as details of the subject, the excercidse they were perofrming and how "well" they perforomed it. We split take the dataset and keep 75% of it for training the model, and 25% for cross validation. For good measure, we also remove columns containing only NA values since they are no use for predcition.
+We begin by importing a dataset that contains data extracted from the acceleraomters, as well as details of the subject, the exercise they were performing and how "well" they performed it. We aim to train a model that can then be used to predict the performance on 20 "out-of-sample" accelerometer 
+
+
+
+We split take the dataset and keep 75% of it for training the model, and 25% for cross validation. For good measure, we also remove columns containing only NA values since they are no use for prediction.
 
 ```{R}
 setwd('C:/Users/Mike/Desktop/PracticalMachineLearning')
 trainingdata <- read.csv('pml-training.csv')
+PredSet <- read.csv('pml-testing.csv')
 inTrain <- createDataPartition(trainingdata$classe, p = 3/4)[[1]]
 training <- trainingdata[inTrain,]
 predictor_cols <- colSums(is.na(training)) == 0
@@ -39,7 +46,7 @@ Now, lets have a look at the training set: -
 head(training)
 ```
 
-There's still a fair few variables, and a few things that we definetely don't want to predict on, like "X" which is the sample ID. We can remove columns that have the lowest variance, and therefore are expected to give weaker predictions using the "nearZeroVar" function. In the follwing code I apply this function to reduce the number of predictors <50, by adjusting the "freqCut" variable through trial and error.
+There's still a fair few variables, and a few things that we definitely don't want to predict on, like "X" which is the sample ID. We can remove columns that have the lowest variance, and therefore are expected to give weaker predictions using the "nearZeroVar" function. In the following code I apply this function to reduce the number of predictors <50, by adjusting the "freqCut" variable through trial and error.
 
 ```{r}
 nzv_data <- nearZeroVar(training, freqCut = 54/48, saveMetrics = T)
@@ -47,7 +54,7 @@ nzv_cols <- nearZeroVar(training, freqCut = 54/48)
 nzv_data
 ```
 
-It's worth noting filtering the columns this way actually removes the classe variable, the very thing we are trying to predict. We should put it back in after we've fimninshed removing the lowest variance columsn.
+It's worth noting filtering the columns this way actually removes the classe variable, the very thing we are trying to predict. We should put it back in after we've finished removing the lowest variance columns.
 
 ```{r}
 training <- training[,-nzv_cols]
@@ -57,25 +64,38 @@ training$classe <- trainingdata[inTrain,]$classe
 ```
 
 
-Lets begin by tyring out a 
+Lets begin by trying out a regression tree and seeing how well it does on the test set.
 
-
-This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+MyTreeFit <- rpart(classe ~ ., data = subset(training, select = -c(user_name, X)), method="class")
+prediction <- predict(MyTreeFit, subset(testing, select = -c(user_name, X)), type = "class")
+AccuracyRPART <- sum(prediction == trainingdata[-inTrain,]$classe)/dim(testing)[1]
+paste("My regression tree accuracy is", AccuracyRPART,".")
 ```
 
-## Including Plots
+`r paste(round(AccuracyRPART*100,2),"%")` seems fairely reasonably, certainly better than would be expected by chance. We will probably be able to do better if we create an ensemble using multiple predicitions methods. Next we shall try a gradient boosted mode: -
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, echo=FALSE}
+boosted_model <- train(subset(training, select = -c(user_name, X))[,-46],subset(training, select = -c(user_name, X))[,46],method="gbm")
+prediction <- predict(boosted_model, subset(testing, select = -c(user_name, X)))
+AccuracyGBM <- sum(trainingdata[-inTrain,]$classe == prediction)/length(trainingdata[-inTrain,]$classe)
+paste("My GBM accuracy is", AccuracyGBM,".")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+The GBM model is significantly better than the regression tree model with an accuracy of `r paste(round(AccuracyGBM*100,2),"%").` on the testing dataset. All things being equal, we would expect similar performance on the out-of-sample test set. 
+
+Here are the predictions for the out of sample data: - 
+
+```{r}
+PredSet <- PredSet[, predictor_cols]
+PredSet <- PredSet[,-nzv_cols] 
+PredSetPrediction <- predict(boosted_model, PredSet)
+PredSet
+```
+
+
+## Conclusion
+
+We expected `r paste(round(AccuracyRPART*100,2),"%"`, of our out-of-sample classifications to be correct, which eqautes to 20/20correct for the small dataset we are tesing against. This is precisecely the score obtained using the model developed here which supports our intial expectation.
+
