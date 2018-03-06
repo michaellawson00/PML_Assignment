@@ -11,6 +11,7 @@ library(rpart)
 library(gbm)
 library(caret)
 library(rpart)
+library(rpart.plot)
 set.seed(800815)
 ```
 
@@ -23,8 +24,6 @@ http://web.archive.org/web/20161125212224/http://groupware.les.inf.puc-rio.br:80
 ### Importing Data
 
 We begin by importing a dataset that contains data extracted from the acceleraomters, as well as details of the subject, the exercise they were performing and how "well" they performed it. We aim to train a model that can then be used to predict the performance on 20 "out-of-sample" accelerometer 
-
-
 
 We split take the dataset and keep 75% of it for training the model, and 25% for cross validation. For good measure, we also remove columns containing only NA values since they are no use for prediction.
 
@@ -40,18 +39,11 @@ testing <- trainingdata[-inTrain,]
 testing <- testing[,predictor_cols]
 ```
 
-Now, lets have a look at the training set: -
-
-```{r}
-head(training)
-```
-
-There's still a fair few variables, and a few things that we definitely don't want to predict on, like "X" which is the sample ID. We can remove columns that have the lowest variance, and therefore are expected to give weaker predictions using the "nearZeroVar" function. In the following code I apply this function to reduce the number of predictors <50, by adjusting the "freqCut" variable through trial and error.
+There's still a fair few variables, and a few things that we definitely don't want to predict on, like "X" which is the sample ID. We can remove columns that have the lowest variance, and therefore are expected to give weaker predictions using the "nearZeroVar" function. In the following code we apply this function to reduce the number of predictors <50, by adjusting the "freqCut" variable through trial and error.
 
 ```{r}
 nzv_data <- nearZeroVar(training, freqCut = 54/48, saveMetrics = T)
 nzv_cols <- nearZeroVar(training, freqCut = 54/48)
-nzv_data
 ```
 
 It's worth noting filtering the columns this way actually removes the classe variable, the very thing we are trying to predict. We should put it back in after we've finished removing the lowest variance columns.
@@ -66,24 +58,25 @@ training$classe <- trainingdata[inTrain,]$classe
 
 Lets begin by trying out a regression tree and seeing how well it does on the test set.
 
-```{r}
-MyTreeFit <- rpart(classe ~ ., data = subset(training, select = -c(user_name, X)), method="class")
+```{r, echo=FALSE, message = FALSE}
+garbage <- capture.output(MyTreeFit <- rpart(classe ~ ., data = subset(training, select = -c(user_name, X)), method="class"))
 prediction <- predict(MyTreeFit, subset(testing, select = -c(user_name, X)), type = "class")
 AccuracyRPART <- sum(prediction == trainingdata[-inTrain,]$classe)/dim(testing)[1]
+rpart.plot(MyTreeFit)
 paste("My regression tree accuracy is", AccuracyRPART,".")
 ```
 
 `r paste(round(AccuracyRPART*100,2),"%")` seems fairely reasonably, certainly better than would be expected by chance. We will probably be able to do better if we create an ensemble using multiple predicitions methods. Next we shall try a gradient boosted mode: -
 
 
-```{r, echo=FALSE}
-boosted_model <- train(subset(training, select = -c(user_name, X))[,-46],subset(training, select = -c(user_name, X))[,46],method="gbm")
+```{r, echo=FALSE, message=FALSE}
+garbage <- capture.output(boosted_model <- train(subset(training, select = -c(user_name, X))[,-46],subset(training, select = -c(user_name, X))[,46],method="gbm"))
 prediction <- predict(boosted_model, subset(testing, select = -c(user_name, X)))
 AccuracyGBM <- sum(trainingdata[-inTrain,]$classe == prediction)/length(trainingdata[-inTrain,]$classe)
 paste("My GBM accuracy is", AccuracyGBM,".")
 ```
 
-The GBM model is significantly better than the regression tree model with an accuracy of `r paste(round(AccuracyGBM*100,2),"%").` on the testing dataset. All things being equal, we would expect similar performance on the out-of-sample test set. 
+The GBM model is significantly better than the regression tree model with an accuracy of `r paste(round(AccuracyRPART*100,2),"%")` on the testing dataset. All things being equal, we would expect similar performance on the out-of-sample test set. 
 
 Here are the predictions for the out of sample data: - 
 
@@ -94,8 +87,7 @@ PredSetPrediction <- predict(boosted_model, PredSet)
 PredSet
 ```
 
-
 ## Conclusion
 
-We expected `r paste(round(AccuracyRPART*100,2),"%"`, of our out-of-sample classifications to be correct, which eqautes to 20/20correct for the small dataset we are tesing against. This is precisecely the score obtained using the model developed here which supports our intial expectation.
+We expected `r paste(round(AccuracyRPART*100,2),"%")`, of our out-of-sample classifications to be correct, which eqautes to 20/20correct for the small dataset we are tesing against. This is precisecely the score obtained using the model developed here which supports our intial expectation.
 
