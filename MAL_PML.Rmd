@@ -66,7 +66,7 @@ rpart.plot(MyTreeFit)
 paste("My regression tree accuracy is", AccuracyRPART,".")
 ```
 
-`r paste(round(AccuracyRPART*100,2),"%")` seems fairely reasonably, certainly better than would be expected by chance. We will probably be able to do better if we create an ensemble using multiple predicitions methods. Next we shall try a gradient boosted mode: -
+`r paste(round(AccuracyRPART*100,2),"%")` seems fairly reasonably, certainly better than would be expected by chance. We will probably be able to do better if we create an ensemble using multiple predictions methods. Next we shall try a gradient boosted mode: -
 
 
 ```{r, echo=FALSE, message=FALSE}
@@ -76,18 +76,18 @@ AccuracyGBM <- sum(trainingdata[-inTrain,]$classe == prediction)/length(training
 paste("My GBM accuracy is", AccuracyGBM,".")
 ```
 
-The GBM model is significantly better than the regression tree model with an accuracy of `r paste(round(AccuracyRPART*100,2),"%")` on the testing dataset. All things being equal, we would expect similar performance on the out-of-sample test set. 
+The GBM model is significantly better than the regression tree model with an accuracy of `r paste(round(AccuracyGBM*100,2),"%")` on the testing dataset. All things being equal, we would expect similar performance on the out-of-sample test set. With this level of accuracy it is not really necessary to ensemble models to achieve 20/20 correct answers in a validation set. Doing so would make the model more complicated and potentially more fragile.
 
 Here are the predictions for the out of sample data: - 
 
-```{r}
+```{r, echo=FALSE}
 PredSet <- PredSet[, predictor_cols]
 PredSet <- PredSet[,-nzv_cols] 
 PredSetPrediction <- predict(boosted_model, PredSet)
-PredSet
+PredSetPrediction
 ```
 
 ## Conclusion
 
-We expected `r paste(round(AccuracyRPART*100,2),"%")`, of our out-of-sample classifications to be correct, which eqautes to 20/20correct for the small dataset we are tesing against. This is precisecely the score obtained using the model developed here which supports our intial expectation.
+We expected `r paste(round(AccuracyGBM*100,2),"%")`, of our out-of-sample classifications to be correct, which equates to 20/20correct for the small dataset we are testing against. This is precisely the score obtained using the model developed here which supports our initial expectation.
 
